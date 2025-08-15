@@ -1,0 +1,179 @@
+/* glass-style.css */
+.loop-card-base {
+  position: absolute;
+  top: 0.5em;
+  left: -0.5rem;
+  width: 240px;
+  height: 280px;
+  border-radius: 1em;
+  background: linear-gradient(90deg, hsla(223, 90%, 60%, 0.438), hsla(223, 90%, 50%, 0.694));
+  z-index: 0;
+}
+
+.loop-card-glass {
+  position: relative;
+  width: 240px;
+  height: 280px;
+  border-radius: 1em;
+  background: linear-gradient(90deg, hsla(0, 0%, 100%, 0.2), hsla(0, 0%, 100%, 0.05));
+  color: white;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
+  z-index: 1;
+}
+
+.loop-card-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid white;
+  mask-image: linear-gradient(135deg, white, transparent 50%);
+}
+
+.loop-card-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid hsl(223, 90%, 50%);
+  mask-image: linear-gradient(135deg, transparent 50%, white);
+  mask-repeat: no-repeat;
+  mask-size: cover;
+  transform-origin: center;
+  will-change: mask-image;
+  pointer-events: none;
+}
+
+/*
+.loop-card-glass:hover::after {
+  animation: rotateMask 5s linear infinite;
+}
+@keyframes rotateMask {
+  0%    { mask-image: linear-gradient(135deg, transparent 40%, white 60%); }
+  5%    { mask-image: linear-gradient(144deg, transparent 40%, white 60%); }
+  10%   { mask-image: linear-gradient(153deg, transparent 40%, white 60%); }
+  15%   { mask-image: linear-gradient(162deg, transparent 40%, white 60%); }
+  20%   { mask-image: linear-gradient(171deg, transparent 40%, white 60%); }
+  25%   { mask-image: linear-gradient(180deg, transparent 40%, white 60%); }
+  30%   { mask-image: linear-gradient(189deg, transparent 40%, white 60%); }
+  35%   { mask-image: linear-gradient(198deg, transparent 40%, white 60%); }
+  40%   { mask-image: linear-gradient(207deg, transparent 40%, white 60%); }
+  45%   { mask-image: linear-gradient(216deg, transparent 40%, white 60%); }
+  50%   { mask-image: linear-gradient(225deg, transparent 40%, white 60%); }
+  55%   { mask-image: linear-gradient(234deg, transparent 40%, white 60%); }
+  60%   { mask-image: linear-gradient(243deg, transparent 40%, white 60%); }
+  65%   { mask-image: linear-gradient(252deg, transparent 40%, white 60%); }
+  70%   { mask-image: linear-gradient(261deg, transparent 40%, white 60%); }
+  75%   { mask-image: linear-gradient(270deg, transparent 40%, white 60%); }
+  80%   { mask-image: linear-gradient(279deg, transparent 40%, white 60%); }
+  85%   { mask-image: linear-gradient(288deg, transparent 40%, white 60%); }
+  90%   { mask-image: linear-gradient(297deg, transparent 40%, white 60%); }
+  95%   { mask-image: linear-gradient(306deg, transparent 40%, white 60%); }
+  100%  { mask-image: linear-gradient(315deg, transparent 40%, white 60%); }
+  95.1% { mask-image: linear-gradient(306deg, transparent 40%, white 60%); }
+  90.1% { mask-image: linear-gradient(297deg, transparent 40%, white 60%); }
+  85.1% { mask-image: linear-gradient(288deg, transparent 40%, white 60%); }
+  80.1% { mask-image: linear-gradient(279deg, transparent 40%, white 60%); }
+  75.1% { mask-image: linear-gradient(270deg, transparent 40%, white 60%); }
+  70.1% { mask-image: linear-gradient(261deg, transparent 40%, white 60%); }
+  65.1% { mask-image: linear-gradient(252deg, transparent 40%, white 60%); }
+  60.1% { mask-image: linear-gradient(243deg, transparent 40%, white 60%); }
+  55.1% { mask-image: linear-gradient(234deg, transparent 40%, white 60%); }
+  50.1% { mask-image: linear-gradient(225deg, transparent 40%, white 60%); }
+  45.1% { mask-image: linear-gradient(216deg, transparent 40%, white 60%); }
+  40.1% { mask-image: linear-gradient(207deg, transparent 40%, white 60%); }
+  35.1% { mask-image: linear-gradient(198deg, transparent 40%, white 60%); }
+  30.1% { mask-image: linear-gradient(189deg, transparent 40%, white 60%); }
+  25.1% { mask-image: linear-gradient(180deg, transparent 40%, white 60%); }
+  20.1% { mask-image: linear-gradient(171deg, transparent 40%, white 60%); }
+  15.1% { mask-image: linear-gradient(162deg, transparent 40%, white 60%); }
+  10.1% { mask-image: linear-gradient(153deg, transparent 40%, white 60%); }
+  5.1%  { mask-image: linear-gradient(144deg, transparent 40%, white 60%); }
+  0.1%  { mask-image: linear-gradient(135deg, transparent 40%, white 60%); }
+}
+*/
+
+
+/* Enhance the card layer */
+.explore-card-glass {
+  backdrop-filter: blur(24px);
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem; /* rounded-xl */
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); /* shadow-md */
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+  position: relative;
+}
+
+.explore-card-glass:hover {
+  box-shadow: 0 15px 25px rgba(0, 0, 0, 0.3); /* hover:shadow-xl */
+  transform: scale(1.02); /* hover:scale-[1.02] */
+}
+
+.explore-card-glass:hover::before {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.08),
+    transparent 70%
+  );
+  animation: glow-spin 6s linear infinite;
+  z-index: 0;
+}
+
+@keyframes glow-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* === Enhanced Glass Styles === */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.glass-card:hover {
+  transform: scale(1.015);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  color: #fff;
+  transition: background 0.2s ease;
+}
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Input for inline editing */
+.inline-input {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-weight: bold;
+  font-size: inherit;
+  outline: none;
+  width: 100%;
+}
