@@ -5,6 +5,7 @@ import { useUser } from '../../store/useUser'
 import { useState } from 'react'
 import { MdGroupAdd } from "react-icons/md";
 
+
 export default function StepPublish({ setStep }) {
   const loop = useCreateLoopStore()
   const { user } = useUser()
@@ -55,6 +56,16 @@ export default function StepPublish({ setStep }) {
     // Delete old loop_cards for this loop
     await supabase.from('loop_cards').delete().eq('loop_id', loopId)
   }
+
+  function dataURLtoBlob(dataURL) {
+    const [header, base64] = dataURL.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(base64);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+    return new Blob([array], { type: mime });
+  }
+
 
   const handleSearch = async (e) => {
     e.preventDefault()
@@ -249,19 +260,56 @@ export default function StepPublish({ setStep }) {
               file_url: card.storage_path,
               file_type: card.file.type,
               size_bytes: card.file.size,
-              loop_card_id: insertedCards[i].id
+              loop_card_id: insertedCards[i].id,
+              thumbnail_url: null, // we will update this next if needed
+              thumbnail_range: card.thumbnailRange || null,
             })
             .select()
             .single()
 
           if (mediaInsertError) throw new Error('Error recording upload: ' + mediaInsertError.message)
-          const { error: updateError } = await supabase
+
+          let thumbnailUrl = null
+
+          // If video, generate thumbnail and upload to media bucket in the same folder structure
+          if (card.file.type.startsWith("video/") && card.thumbnail) {
+            try {
+              const thumbBlob = dataURLtoBlob(card.thumbnail); // convert base64 -> Blob
+              const thumbName = card.storage_path
+                .replace(/^loop_media\//, '') 
+                .replace(/\.[^/.]+$/, '_thumb.jpg'); 
+              const thumbPath = `thumbnails/${thumbName}`;
+
+              const { error: thumbError } = await supabase.storage
+                .from('media')
+                .upload(thumbPath, thumbBlob, { cacheControl: '3600', upsert: true });
+
+              if (thumbError) throw thumbError;
+
+              thumbnailUrl = `loop_media/thumbnails/${thumbName}`;
+
+              await supabase
+                .from('media_uploads')
+                .update({ thumbnail_url: thumbnailUrl })
+                .eq('id', mediaInsert.id);
+
+            } catch (err) {
+              console.error("Thumbnail upload failed:", err);
+            }
+          }
+
+
+          // Update loop_card with media_upload_id
+          await supabase
             .from('loop_cards')
             .update({ media_upload_id: mediaInsert.id })
             .eq('id', insertedCards[i].id)
+
           uploadedArtifacts.push({ path: card.storage_path, mediaId: mediaInsert.id })
         }
       }
+
+
 
       // ---------------------------
       // STEP 5 — Manage collaborators
@@ -341,14 +389,14 @@ export default function StepPublish({ setStep }) {
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search by username"
             className="flex-grow min-w-[180px] border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg
-                       focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-gray-100 focus:border-black dark:focus:border-white
+                        focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-gray-100 focus:border-black dark:focus:border-white
                         text-gray-900 dark:text-gray-100 transition"
           />
           <button
             type="submit"
             className={`bg-black ${searchInput.trim() === '' ? 'dark:bg-gray-500 cursor-not-allowed' : 'dark:bg-gray-300'}  dark:text-black text-white px-6 py-2 rounded-lg
-                       hover:bg-gray-800 dark:hover:bg-gray-300 transition font-semibold shadow-sm
-                       flex-shrink-0`}
+                        hover:bg-gray-800 dark:hover:bg-gray-300 transition font-semibold shadow-sm
+                        flex-shrink-0`}
           >
             Add
           </button>

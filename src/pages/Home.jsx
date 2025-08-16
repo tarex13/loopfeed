@@ -14,7 +14,7 @@ import '../assets/glass-style.css' // ← Import the glass effect CSS
 const PULL_THRESHOLD = 60
 const PAGE_SIZE = 12
 
-export default function Home() {
+export default function Home({setShowNav}) {
   const { user, loading: loadingUser } = useUser()
   const fetched = useRef(false)
   const [sections, setSections] = useState({})
@@ -26,7 +26,7 @@ export default function Home() {
 
   const fetchSectionData = async ({ key, page = 1 }) => {
     let query = supabase.from('loops')
-      .select('*, cards:loop_cards(type, content, position, metadata, is_upload)')
+      .select('*, cards:loop_cards(type, content, position, metadata, is_upload, media_uploads:media_uploads!loop_cards_media_upload_id_fkey(thumbnail_url))')
       .eq('status', 'normal')
       .eq('visibility', 'public')
 
@@ -172,6 +172,8 @@ export default function Home() {
       el.removeEventListener('touchend', onTouchEnd)
     }
   }, [pullStatus])
+  useEffect(()=>setShowNav(true), [])
+  
 
   return (
     <div

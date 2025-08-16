@@ -35,12 +35,30 @@ export default function LoopViewer({ setShowNav }) {
   const [showWhisper, setShowWhisper] = useState(false)
   const [showFolderMenu, setShowFolderMenu] = useState(false)
   const [folders, setFolders] = useState([])
+  
+  const [signedUrls, setSignedUrls] = useState({})
   const [showFolderModal, setShowFolderModal] = useState(false)
   const [canView, setCanView] = useState(false)
+
 
   const timerRef = useRef(null)
 
   useEffect(() => setShowNav(false), [])
+
+  const fetchSignedUrl = async (card) => {
+    if (card?.is_upload && card?.content) {
+      const { data, error } = await supabase.storage
+        .from('media')
+        .createSignedUrl(card.content, 60 * 30)
+      if (error) {
+        console.error('Error fetching signed URL:', error)
+        return null
+      }
+      return data?.signedUrl || null
+    }
+    return null
+  }
+
 
   useEffect(() => {
     const fetchLoop = async () => {
@@ -119,6 +137,20 @@ export default function LoopViewer({ setShowNav }) {
 
     fetchLoop()
   }, [id, user])
+
+
+  useEffect(() => {
+    const fetchAllSignedUrls = async () => {
+      const urls = {}
+      for (let i = 0; i < cards.length; i++) {
+        if (cards[i].is_upload) {
+          urls[i] = await fetchSignedUrl(cards[i])
+        }
+      }
+      setSignedUrls(urls)
+    }
+    if (cards.length > 0) fetchAllSignedUrls()
+  }, [cards])
 
   useEffect(() => {
     if (loop?.autoplay && cards.length > 1) {
@@ -243,7 +275,7 @@ export default function LoopViewer({ setShowNav }) {
             >
               <LoopCardPreview
                 type={current?.type?.toLowerCase()}
-                url={current?.content}
+                url={current?.is_upload ? signedUrls[index.toString()] : current?.content}
                 backgroundColor={bg}
                 metadata={current?.metadata}
                 loop={loop}
@@ -325,77 +357,77 @@ export default function LoopViewer({ setShowNav }) {
             />
           )}
         </div>
-</div>
-<AnimatePresence>
-  {showCollaborators && (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ duration: 0.3 }}
-      className="mt-4 p-4 rounded-xl shadow-lg absolute bottom-[10vh] shadow-sm shadow-zinc-400/40 left-1/2 -translate-x-1/2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 backdrop-blur-md text-sm"
-    >
-      <h4 className="font-semibold text-zinc-800 dark:text-zinc-200 mb-3">Collaborators</h4>
+        </div>
+        <AnimatePresence>
+          {showCollaborators && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mt-4 p-4 rounded-xl shadow-lg absolute bottom-[10vh] shadow-sm shadow-zinc-400/40 left-1/2 -translate-x-1/2 w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 backdrop-blur-md text-sm"
+            >
+              <h4 className="font-semibold text-zinc-800 dark:text-zinc-200 mb-3">Collaborators</h4>
 
-      <ul className="space-y-3 divide-y divide-zinc-200 dark:divide-zinc-700">
-        {loop.collaborators.map((collab) => (
-          <li key={collab.id} className="flex items-center justify-between pt-2">
-            <div className="flex items-center gap-3">
-              {/* Avatar or initials fallback */}
-              {collab.avatar ? (
-                <img
-                  src={collab.avatar}
-                  alt={collab.username}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 text-xs flex items-center justify-center text-zinc-700 dark:text-white font-bold">
-                  {collab.display_name?.[0]?.toUpperCase() || collab.username?.[0]?.toUpperCase()}
-                </div>
-              )}
+              <ul className="space-y-3 divide-y divide-zinc-200 dark:divide-zinc-700">
+                {loop.collaborators.map((collab) => (
+                  <li key={collab.id} className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-3">
+                      {/* Avatar or initials fallback */}
+                      {collab.avatar ? (
+                        <img
+                          src={collab.avatar}
+                          alt={collab.username}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-zinc-300 dark:bg-zinc-700 text-xs flex items-center justify-center text-zinc-700 dark:text-white font-bold">
+                          {collab.display_name?.[0]?.toUpperCase() || collab.username?.[0]?.toUpperCase()}
+                        </div>
+                      )}
 
-              {/* Name + link */}
-              <div className="flex flex-col">
-                <a
-                  href={`/u/${collab.username}`}
-                  className="font-medium text-zinc-800 dark:text-zinc-100 hover:underline hover:text-blue-500 dark:hover:text-blue-400"
-                >
-                  {collab.display_name || collab.username}
-                </a>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">@{collab.username}</span>
-              </div>
-            </div>
+                      {/* Name + link */}
+                      <div className="flex flex-col">
+                        <a
+                          href={`/u/${collab.username}`}
+                          className="font-medium text-zinc-800 dark:text-zinc-100 hover:underline hover:text-blue-500 dark:hover:text-blue-400"
+                        >
+                          {collab.display_name || collab.username}
+                        </a>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">@{collab.username}</span>
+                      </div>
+                    </div>
 
-            {/* Role + status badge */}
-            <div className="flex items-center gap-2">
-              {collab.role && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 shadow- shadow-zinc-400 dark:border-zinc-600">
-                  {collab.role}
-                </span>
-              )}
-              {/*collab.status && (
-                <span
-                  className={`
-                    text-xs px-2 py-0.5 rounded-full border
-                    ${
-                      collab.status === 'accepted'
-                        ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700'
-                        : collab.status === 'pending'
-                        ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700'
-                        : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
-                    }
-                  `}
-                >
-                  {collab.status}
-                </span>
-              )*/}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </motion.div>
-  )}
-</AnimatePresence>
+                    {/* Role + status badge */}
+                    <div className="flex items-center gap-2">
+                      {collab.role && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 shadow- shadow-zinc-400 dark:border-zinc-600">
+                          {collab.role}
+                        </span>
+                      )}
+                      {/*collab.status && (
+                        <span
+                          className={`
+                            text-xs px-2 py-0.5 rounded-full border
+                            ${
+                              collab.status === 'accepted'
+                                ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700'
+                                : collab.status === 'pending'
+                                ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700'
+                                : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
+                            }
+                          `}
+                        >
+                          {collab.status}
+                        </span>
+                      )*/}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
 
 

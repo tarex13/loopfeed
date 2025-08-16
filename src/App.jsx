@@ -45,7 +45,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col  dark:bg-[#0d0d10]">
       <div className="flex-grow">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Home setShowNav={setShowNav} />} />
           <Route path="/auth" element={<Auth setShowNav={setShowNav} />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/settings" element={<Settings />} />

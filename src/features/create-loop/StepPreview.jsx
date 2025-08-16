@@ -7,7 +7,9 @@ export default function StepPreview() {
   const { cards, autoplay, theme, font, bgColor, music } = useCreateLoopStore()
   const [index, setIndex] = useState(0)
   const current = cards[index]
+  const [previewUrl, setPreviewUrl] = useState(null)
 
+  // Autoplay
   useEffect(() => {
     if (!autoplay || cards.length === 0) return
     const timer = setInterval(() => {
@@ -15,6 +17,25 @@ export default function StepPreview() {
     }, 3500)
     return () => clearInterval(timer)
   }, [autoplay, cards.length])
+
+  // Create object URL safely
+  useEffect(() => {
+    if (!current) {
+      setPreviewUrl(null)
+      return
+    }
+
+    if (current.file) {
+      const objectUrl = URL.createObjectURL(current.file)
+      setPreviewUrl(objectUrl)
+
+      return () => {
+        URL.revokeObjectURL(objectUrl) // revoke previous URL on cleanup
+      }
+    }
+
+    setPreviewUrl(current.content || null)
+  }, [current])
 
   const fontClasses = {
     default: 'font-sans',
@@ -42,7 +63,7 @@ export default function StepPreview() {
 
       <div className="text-center mb-2">
         <h3 className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Previewing card {index > 0 ? index + 1 : index} of {cards.length}
+          Previewing card {index + 1} of {cards.length}
         </h3>
       </div>
 
@@ -66,13 +87,15 @@ export default function StepPreview() {
                 <blockquote className="text-lg sm:text-2xl leading-relaxed font-medium px-4 py-2 whitespace-pre-wrap break-words">
                   “{current.content.trim()}”
                 </blockquote>
-              ) : (
+              ) : previewUrl ? (
                 <LoopCardPreview
                   type={current.type}
-                  url={current.content || current.preview}
+                  url={previewUrl}
                   metadata={current.metadata}
                   backgroundColor={bgColor}
                 />
+              ) : (
+                <div>Loading preview…</div>
               )}
             </div>
           </motion.div>
@@ -81,7 +104,7 @@ export default function StepPreview() {
         <div className="text-center text-gray-400">No cards yet. Go back and add some.</div>
       )}
 
-      {index > 0 && (
+      {cards.length > 1 && (
         <div className="mt-6 flex justify-center gap-6">
           <button
             onClick={() => setIndex((index - 1 + cards.length) % cards.length)}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useCreateLoopStore } from './useCreateLoopStore';
 import { nanoid } from 'nanoid';
 import {
@@ -52,47 +52,6 @@ const isValidVideo = (url) => getYouTubeEmbed(url) || getVimeoEmbed(url);
 const isValidSong = (url) =>
   getSpotifyEmbed(url) || getAppleMusicEmbed(url) || getSoundCloudEmbed(url) || isValidAudio(url);
 
-// ===== UTILITY: GENERATE VIDEO THUMBNAIL =====
-const generateVideoThumbnail = (videoUrl, time = 0, scale = 0.5) =>
-  new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    video.src = videoUrl;
-    video.crossOrigin = 'anonymous';
-    video.preload = 'metadata';
-
-    const drawCanvas = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = (video.videoWidth || 640) * scale;
-      canvas.height = (video.videoHeight || 360) * scale;
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg'));
-    };
-
-    video.addEventListener('loadedmetadata', () => {
-      // clamp requested time
-      const validTime = Math.min(Math.max(0, time), video.duration - 0.1);
-      
-      // wait for seeked frame
-      const onSeeked = () => {
-        drawCanvas();
-        video.removeEventListener('seeked', onSeeked);
-      };
-
-      video.addEventListener('seeked', onSeeked);
-
-      try {
-        video.currentTime = validTime;
-      } catch {
-        // fallback if seeking fails
-        drawCanvas();
-      }
-    });
-
-    video.onerror = (err) => reject(err);
-  });
-
-
-
 export default function StepCards() {
   const { cards, setField, addChangedCard } = useCreateLoopStore();
 
@@ -102,96 +61,42 @@ export default function StepCards() {
   const [fileName, setFileName] = useState(null);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [autoThumbnail, setAutoThumbnail] = useState(null);
-  const [customThumbnail, setCustomThumbnail] = useState(null);
   const [metadata, setMetadata] = useState(null);
   const [error, setError] = useState(null);
-  const [range, setRange] = useState(0);
   const [editIndex, setEditIndex] = useState(null);
-  const [videoDuration, setVideoDuration] = useState(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Revoke old blob previews
-  useEffect(() => {
-    return () => {
-      if (preview && typeof preview === 'string' && preview.startsWith('blob:')) {
-        try { URL.revokeObjectURL(preview); } catch {}
-      }
-    };
-  }, [preview]);
+  // ===== File validation (no upload here) =====
+  const handleFileSelect = (file) => {
+    //console.log(file);
+    if (!file) return;
 
-  const handleFileSelect = async (f) => {
-    if (!f) return;
-
-    if (preview && preview.startsWith('blob:')) {
-      try { URL.revokeObjectURL(preview); } catch {}
-    }
-
-    if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
       setError(`File too large. Max ${MAX_FILE_SIZE_MB}MB allowed.`);
       return;
     }
 
-    if (type === 'image' && !ALLOWED_IMAGE_TYPES.includes(f.type)) {
+    if (type === 'image' && !ALLOWED_IMAGE_TYPES.includes(file.type)) {
       setError('Unsupported image type.');
       return;
     }
-    if (type === 'video' && !ALLOWED_VIDEO_TYPES.includes(f.type)) {
+    if (type === 'video' && !ALLOWED_VIDEO_TYPES.includes(file.type)) {
       setError('Unsupported video type.');
       return;
     }
-    if (type === 'song' && !ALLOWED_AUDIO_TYPES.includes(f.type)) {
+    if (type === 'song' && !ALLOWED_AUDIO_TYPES.includes(file.type)) {
       setError('Unsupported audio type.');
       return;
     }
 
-    const blobUrl = URL.createObjectURL(f);
     setError(null);
-    setFile(f);
-    setContent(null);
-    setFileName(f.name || null);
-    setPreview(blobUrl);
-    setCustomThumbnail(null);
-    setVideoDuration(0); // reset; LoopCardPreview will set it
-
-    if (type === 'video' && provider === 'Upload') {
-      try {
-        const thumb = await generateVideoThumbnail(blobUrl);
-        setAutoThumbnail(thumb);
-      } catch (err) {
-        console.error('Thumbnail generation failed', err);
-        setAutoThumbnail(null);
-      }
-    }
-  };
-
-  const handleEdit = (i) => {
-    const c = cards[i];
-
-    setType(c.type);
-    setFileName(c.file_name || c.file?.name || '');
-    setContent(c.content || '');
-    setFile(c.file || null);
-
-    if (preview && preview.startsWith('blob:')) {
-      try { URL.revokeObjectURL(preview); } catch {}
-    }
-
-    const newPreview =
-      c.is_upload && c.file ? URL.createObjectURL(c.file) : c.preview || c.content || null;
-
-    setPreview(newPreview);
-    setAutoThumbnail(c.type === 'video' && c.is_upload && c.file ? newPreview : null);
-    setCustomThumbnail(c.thumbnail);
-    setRange(c.thumbnailRange || 0);
-    setMetadata(c.metadata || null);
-    setProvider(c.is_upload ? 'Upload' : '');
-    setEditIndex(i);
-    setVideoDuration(0);
+    setFile(file);
+    setPreview(URL.createObjectURL(file)); // preview blob
+    setContent(null); // will set after publish
   };
 
   const fetchMetadata = async (url) => {
@@ -201,6 +106,7 @@ export default function StepCards() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
+
       if (!res.ok) throw new Error('Metadata fetch failed');
       const data = await res.json();
       setMetadata(data);
@@ -213,11 +119,9 @@ export default function StepCards() {
   const handleContentChange = async (val) => {
     setContent(val);
     setFile(null);
-    setFileName(null);
     setPreview(val);
     setMetadata(null);
     setError(null);
-    setVideoDuration(0);
 
     if (!val) return;
 
@@ -230,26 +134,26 @@ export default function StepCards() {
     if (type === 'song' && !isValidSong(val)) {
       setError('Unsupported song link. Use Spotify, Apple Music, SoundCloud, or upload.');
     }
-    if (type === 'embed') await fetchMetadata(val);
+    if (type === 'embed') {
+      await fetchMetadata(val);
+    }
     if (type === 'social') {
       const supported = ['tiktok.com', 'instagram.com', 'twitter.com', 'x.com'];
-      if (!supported.some((d) => val.includes(d))) setError('Unsupported social link.');
+      if (!supported.some((d) => val.includes(d))) {
+        setError('Unsupported social link.');
+      }
     }
   };
 
   const handleAddOrUpdateCard = () => {
     if ((!content && !file) || error) return;
-
-    const chosenThumbnail = customThumbnail || autoThumbnail || preview;
-
+    
     const newCard = {
       localId: editIndex !== null ? cards[editIndex].localId : nanoid(),
       type,
       content: content || null,
       file: file || null,
       preview: preview || null,
-      thumbnail: chosenThumbnail,
-      thumbnailRange: range,
       metadata,
       provider,
       is_upload: provider === 'Upload',
@@ -257,88 +161,67 @@ export default function StepCards() {
 
     if (editIndex !== null) {
       const oldCard = cards[editIndex];
+
+      // Compare old vs new to see if anything actually changed
       const changed =
         oldCard.type !== newCard.type ||
         oldCard.content !== newCard.content ||
         oldCard.is_upload !== newCard.is_upload ||
-        oldCard.thumbnailRange !== newCard.thumbnailRange ||
-        oldCard.file?.name !== newCard.file?.name ||
+        (oldCard.file?.name !== newCard.file?.name) ||
         JSON.stringify(oldCard.metadata) !== JSON.stringify(newCard.metadata);
 
       const updated = [...cards];
       updated[editIndex] = newCard;
       setField('cards', updated);
+
       if (changed) addChangedCard(newCard.localId);
     } else {
       setField('cards', [...cards, newCard]);
     }
 
+    // reset form
     setContent('');
     setFile(null);
     setPreview(null);
-    setAutoThumbnail(null);
-    setCustomThumbnail(null);
     setMetadata(null);
     setProvider('');
-    setRange(0);
     setError(null);
     setEditIndex(null);
-    setVideoDuration(0);
+  };
+
+
+  const handleEdit = (i) => {
+    const c = cards[i];
+    setType(c.type);
+    //console.log(c)
+    setFileName(c.file_name);
+    setContent(c.content);
+    setFile(c.file || null);
+    setPreview(c.preview || (c.is_upload && c.file ? URL.createObjectURL(c.file) : c.content));
+    setMetadata(c.metadata || null);
+    setProvider(c.is_upload ? 'Upload' : '');
+    setEditIndex(i);
   };
 
   const handleRemove = (index) => {
     const updated = [...cards];
-    const removed = cards[index];
-    if (removed.preview?.startsWith('blob:')) {
-      try { URL.revokeObjectURL(removed.preview); } catch {}
-    }
     updated.splice(index, 1);
     setField('cards', updated);
     if (editIndex === index) {
       setEditIndex(null);
       setContent('');
       setPreview(null);
-      setCustomThumbnail(null);
-      setAutoThumbnail(null);
-      setVideoDuration(0);
     }
   };
-
-  const debounce = (fn, delay) => {
-    let timeout;
-    return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => fn(...args), delay);
-    };
-  };
-
-  const debouncedGenerateThumbnail = debounce(async (videoUrl, t) => {
-    try {
-      const thumb = await generateVideoThumbnail(videoUrl, t);
-      setCustomThumbnail(thumb);
-    } catch (err) {
-      console.error(err);
-    }
-  }, 100);
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
-    if (active?.id && over?.id && active.id !== over.id) {
-      const oldIndex = cards.findIndex((c) => c.localId === active.id);
-      const newIndex = cards.findIndex((c) => c.localId === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        setField('cards', arrayMove(cards, oldIndex, newIndex));
-      }
+    if (active.id !== over?.id) {
+      const oldIndex = parseInt(active.id);
+      const newIndex = parseInt(over.id);
+      setField('cards', arrayMove(cards, oldIndex, newIndex));
     }
   };
-
-  function calculateStep(duration) {
-    if (!Number.isFinite(duration) || duration <= 0) return 0.1;
-    const baseStep = 0.1;
-    const maxStep = 5;
-    const step = baseStep * Math.ceil(Math.log10(duration + 1));
-    return Math.min(step, maxStep);
-  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -351,12 +234,10 @@ export default function StepCards() {
             setType(e.target.value);
             setContent('');
             setFile(null);
-            setFileName(null);
             setPreview(null);
             setProvider('');
             setMetadata(null);
             setError(null);
-            setVideoDuration(0);
           }}
           className="w-full px-4 py-2 rounded border focus:ring focus:outline-none dark:bg-[#0d0d10] dark:text-white"
         >
@@ -369,7 +250,7 @@ export default function StepCards() {
         </select>
       </div>
 
-      {/* Provider selector */}
+      {/* Provider */}
       {providerOptions[type] && (
         <div>
           <label className="block text-sm font-semibold mb-1">Provider</label>
@@ -379,10 +260,7 @@ export default function StepCards() {
               setProvider(e.target.value);
               setContent('');
               setFile(null);
-              setFileName(null);
               setError(null);
-              setPreview(null);
-              setVideoDuration(0);
             }}
             className="w-full px-4 py-2 rounded border focus:ring focus:outline-none dark:bg-[#0d0d10] dark:text-white"
           >
@@ -432,35 +310,7 @@ export default function StepCards() {
 
         {preview && !error && (
           <div className="mt-3">
-            <LoopCardPreview
-              type={type}
-              url={preview}
-              metadata={metadata}
-              onLoadedMetadata={(d) => setVideoDuration(d)}
-              loop={null}
-              card={{ is_upload: provider === 'Upload' }}
-            />
-          </div>
-        )}
-
-        {type === 'video' && provider === 'Upload' && preview && Number.isFinite(videoDuration) && videoDuration > 0 && (
-         
-          <div className="mt-3"> 
-            <input
-              type="range"
-              min="0"
-              value={range}
-              max={videoDuration}
-              step={calculateStep(videoDuration)}
-              onChange={(e) => {
-                const t = parseFloat(e.target.value);
-                setRange(t); // immediate update for UI
-                debouncedGenerateThumbnail(preview, t);
-              }}
-            />
-            {customThumbnail && (
-              <img src={customThumbnail} alt="Custom thumbnail" className="mt-2 w-32 h-auto rounded border" />
-            )}
+            <LoopCardPreview type={type} url={preview} metadata={metadata} />
           </div>
         )}
 
@@ -473,14 +323,14 @@ export default function StepCards() {
         </button>
       </div>
 
-      {/* Cards list */}
+      {/* List */}
       <div className="mt-8">
         <h3 className="text-sm font-semibold mb-2">Your Cards</h3>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={cards.map((c) => c.localId)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={cards.map((_, i) => i.toString())} strategy={verticalListSortingStrategy}>
             <div className="space-y-4">
               {cards.map((card, i) => (
-                <SortableItem key={card.localId} id={card.localId}>
+                <SortableItem key={i} id={i.toString()}>
                   {({ attributes, listeners }) => (
                     <div className="flex justify-between items-start w-full px-4 py-2 rounded border shadow dark:bg-[#0d0d10]">
                       <div {...attributes} {...listeners} className="cursor-grab pr-2 select-none">⠿</div>
