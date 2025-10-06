@@ -147,6 +147,7 @@ export default function LoopViewer({ setShowNav }) {
           urls[i] = await fetchSignedUrl(cards[i])
         }
       }
+      console.log(urls)
       setSignedUrls(urls)
     }
     if (cards.length > 0) fetchAllSignedUrls()
@@ -307,7 +308,7 @@ export default function LoopViewer({ setShowNav }) {
 
       <div className="absolute bottom-4 flex gap-3 flex-wrap justify-center z-10">
         <button
-          onClick={() => alert('TODO: Remix logic')}
+          onClick={() => navigate(`remix/${loop.id}`)}
           className="px-4 py-2 bg-black border-2 border-gray-500 text-white rounded-full shadow hover:bg-gray-800"
         >
           ♻️ Remix

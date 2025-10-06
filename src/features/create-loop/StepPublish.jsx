@@ -73,7 +73,7 @@ export default function StepPublish({ setStep }) {
     if (!trimmedInput) return
 
     try {
-      const res = await fetch('/.netlify/functions/search-users', {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/search-users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,35 +111,33 @@ export default function StepPublish({ setStep }) {
     let loopId = loop.id
     let loopData = null
     let isNewLoop = false
-
     const updatedCards = []
-    const uploadedArtifacts = [] // { path, mediaId } for cleanup if needed
+    const uploadedArtifacts = []
 
     try {
       // ---------------------------
-      // STEP 0 — Cleanup old media & cards on edit (delete old files only once)
+      // STEP 0 — Cleanup old media & cards on edit
       // ---------------------------
       if (loopId) {
         await deleteOldMedia(loopId)
       }
 
       // ---------------------------
-      // STEP 1 — Upload files for current cards
+      // STEP 1 — Handle uploads / remix duplication
       // ---------------------------
       for (let i = 0; i < loop.cards.length; i++) {
         const card = loop.cards[i]
 
+        // Case A: new upload from user device
         if (card.file instanceof File) {
           const mime = card.file.type
           if (![...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES, ...ALLOWED_AUDIO_TYPES].includes(mime)) {
             alert(`File type ${mime || 'unknown'} is not allowed.`)
-            setSaving(false)
-            return
+            setSaving(false); return
           }
           if (card.file.size > MAX_FILE_SIZE) {
             alert(`File size exceeds ${MAX_FILE_SIZE / (1024 * 1024)} MB limit.`)
-            setSaving(false)
-            return
+            setSaving(false); return
           }
 
           const safeName = sanitizeFileName(card.file.name || `upload-${i}`)
@@ -149,27 +147,33 @@ export default function StepPublish({ setStep }) {
             .from('media')
             .upload(path, card.file, { cacheControl: '3600', upsert: false })
 
-          if (storageError) {
-            console.error('Storage upload error:', storageError)
-            alert('Error uploading file: ' + storageError.message)
-            // Cleanup any already uploaded files this session
-            for (const a of uploadedArtifacts) {
-              try { await supabase.storage.from('media').remove([a.path]) } catch {}
-              try { await supabase.from('media_uploads').delete().eq('id', a.mediaId) } catch {}
-            }
-            setSaving(false)
-            return
+          if (storageError) throw new Error('Error uploading file: ' + storageError.message)
+
+          updatedCards.push({ ...card, content: path, storage_path: path, media_upload_id: null })
+
+        // Case B: remixing someone else’s media (duplicate)
+        } else if (loop.isRemix && card.content?.includes("loop_media/") && !card.content.includes(`loop_media/${user.id}/`)) {
+          try {
+            const response = await fetch(card.content)
+            if (!response.ok) throw new Error("Failed to fetch original media for remix")
+
+            const blob = await response.blob()
+            const safeName = sanitizeFileName(`remix-${Date.now()}-${i}`)
+            const path = `loop_media/${user.id}/${safeName}`
+
+            const { error: storageError } = await supabase.storage
+              .from('media')
+              .upload(path, blob, { cacheControl: '3600', upsert: false })
+
+            if (storageError) throw new Error('Error duplicating media: ' + storageError.message)
+
+            updatedCards.push({ ...card, content: path, storage_path: path, media_upload_id: null })
+          } catch (err) {
+            console.error("Remix duplication failed:", err)
+            throw err
           }
 
-        //  const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(path)
-        //const publicUrl = publicUrlData?.publicUrl || null////
-
-          updatedCards.push({
-            ...card,
-            content: path,
-            storage_path: path,
-            media_upload_id: null
-          })
+        // Case C: keep as-is
         } else {
           updatedCards.push(card)
         }
@@ -182,6 +186,7 @@ export default function StepPublish({ setStep }) {
       const coverUrl = ['image', 'video'].includes(firstCard?.type) ? firstCard.content : null
 
       if (loopId) {
+        // Update existing loop
         const { error: updateError } = await supabase.from('loops')
           .update({
             title: loop.title,
@@ -194,13 +199,15 @@ export default function StepPublish({ setStep }) {
             music: loop.music,
             visibility: isDraft ? 'unlisted' : loop.visibility,
             status: isDraft ? 'draft' : 'normal',
-            cover_url: coverUrl
+            cover_url: coverUrl,
+            is_remix: false,
           })
           .eq('id', loopId)
 
         if (updateError) throw new Error('Error updating loop: ' + updateError.message)
         loopData = { id: loopId }
       } else {
+        // Create new loop
         const { data, error: insertError } = await supabase.from('loops')
           .insert([{
             title: loop.title,
@@ -210,9 +217,9 @@ export default function StepPublish({ setStep }) {
             theme: loop.theme,
             font: loop.font,
             bg_color: loop.bgColor,
-            is_remix: loop.isRemix,
             music: loop.music,
             user_id: user.id,
+            is_remix: loop.isRemix || false,
             visibility: isDraft ? 'unlisted' : loop.visibility,
             status: isDraft ? 'draft' : 'normal',
             cover_url: coverUrl
@@ -227,7 +234,7 @@ export default function StepPublish({ setStep }) {
       }
 
       // ---------------------------
-      // STEP 3 — Insert cards with loop_card_ids
+      // STEP 3 — Insert loop_cards
       // ---------------------------
       const cardInserts = updatedCards.map((card, idx) => ({
         loop_id: loopId,
@@ -247,21 +254,22 @@ export default function StepPublish({ setStep }) {
       if (cardError) throw new Error('Error saving cards: ' + cardError.message)
 
       // ---------------------------
-      // STEP 4 — Insert media_uploads for cards with files
+      // STEP 4 — Insert media_uploads
       // ---------------------------
       for (let i = 0; i < updatedCards.length; i++) {
         const card = updatedCards[i]
         if (card.storage_path) {
+          const fileInfo = card.file || {} // may not exist for remix duplication
           const { data: mediaInsert, error: mediaInsertError } = await supabase
             .from('media_uploads')
             .insert({
               user_id: user.id,
-              file_name: card.file.name,
+              file_name: fileInfo.name || `remix-${i}`,
               file_url: card.storage_path,
-              file_type: card.file.type,
-              size_bytes: card.file.size,
+              file_type: fileInfo.type || card.mime_type || card.type,
+              size_bytes: fileInfo.size || card.size_bytes || null,
               loop_card_id: insertedCards[i].id,
-              thumbnail_url: null, // we will update this next if needed
+              thumbnail_url: null,
               thumbnail_range: card.thumbnailRange || null,
             })
             .select()
@@ -269,39 +277,7 @@ export default function StepPublish({ setStep }) {
 
           if (mediaInsertError) throw new Error('Error recording upload: ' + mediaInsertError.message)
 
-          let thumbnailUrl = null
-
-          // If video, generate thumbnail and upload to media bucket in the same folder structure
-          if (card.file.type.startsWith("video/") && card.thumbnail) {
-            try {
-              const thumbBlob = dataURLtoBlob(card.thumbnail); // convert base64 -> Blob
-              const thumbName = card.storage_path
-                .replace(/^loop_media\//, '') 
-                .replace(/\.[^/.]+$/, '_thumb.jpg'); 
-              const thumbPath = `thumbnails/${thumbName}`;
-
-              const { error: thumbError } = await supabase.storage
-                .from('media')
-                .upload(thumbPath, thumbBlob, { cacheControl: '3600', upsert: true });
-
-              if (thumbError) throw thumbError;
-
-              thumbnailUrl = `loop_media/thumbnails/${thumbName}`;
-
-              await supabase
-                .from('media_uploads')
-                .update({ thumbnail_url: thumbnailUrl })
-                .eq('id', mediaInsert.id);
-
-            } catch (err) {
-              console.error("Thumbnail upload failed:", err);
-            }
-          }
-
-
-          // Update loop_card with media_upload_id
-          await supabase
-            .from('loop_cards')
+          await supabase.from('loop_cards')
             .update({ media_upload_id: mediaInsert.id })
             .eq('id', insertedCards[i].id)
 
@@ -309,15 +285,12 @@ export default function StepPublish({ setStep }) {
         }
       }
 
-
-
       // ---------------------------
-      // STEP 5 — Manage collaborators
+      // STEP 5 — Collaborators
       // ---------------------------
       if (loop.id) {
         await supabase.from('loop_collaborators').delete().eq('loop_id', loopId)
       }
-
       if (collaborators.length) {
         const inserts = collaborators.map((c) => ({
           loop_id: loopId,
@@ -338,6 +311,9 @@ export default function StepPublish({ setStep }) {
         }])
       }
 
+      // ---------------------------
+      // Done
+      // ---------------------------
       setSaving(false)
       if (isDraft) {
         alert('💾 Draft saved!')
@@ -356,6 +332,8 @@ export default function StepPublish({ setStep }) {
       setSaving(false)
     }
   }
+
+
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">

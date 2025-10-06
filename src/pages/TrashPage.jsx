@@ -19,7 +19,7 @@ export default function TrashPage() {
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'trashed')
-        .select('*, loop_cards(type, content, metadata)');
+        .select('*, loop_cards(type, content, metadata, media_uploads:media_uploads!loop_cards_media_upload_id_fkey(thumbnail_url))');
       setLoops(data || []);
       setLoading(false);
     };

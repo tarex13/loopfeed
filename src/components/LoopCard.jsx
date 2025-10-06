@@ -20,17 +20,35 @@ export default function LoopCard({
   // Preload signed URL for uploads
   useEffect(() => {
     const fetchSignedUrl = async () => {
-      if (card?.is_upload && card?.content) {
+      if (!card?.is_upload) return;
+
+      // video → use thumbnail
+      if (card.type === 'video' && card.media_uploads?.thumbnail_url) {
         const { data, error } = await supabase.storage
           .from('media')
-          .createSignedUrl(card.content, 60 * 30) // 30 min expiry
+          .createSignedUrl(card.media_uploads.thumbnail_url, 60 * 30);
+
         if (!error && data?.signedUrl) {
-          setSignedContent(data.signedUrl)
+          setSignedContent(data.signedUrl);
+        }
+        return;
+      }
+
+      // everything else → use content
+      if (card.content) {
+        const { data, error } = await supabase.storage
+          .from('media')
+          .createSignedUrl(card.content, 60 * 30);
+
+        if (!error && data?.signedUrl) {
+          setSignedContent(data.signedUrl);
         }
       }
-    }
-    fetchSignedUrl()
-  }, [card])
+    };
+
+    fetchSignedUrl();
+  }, [card]);
+
 
   // External embed helpers
   const youtube = getYouTubeEmbed(signedContent)
@@ -48,7 +66,7 @@ export default function LoopCard({
 
     switch (type) {
       case 'image':
-        return <img src={signedContent} alt="Cover" className="w-full h-full object-cover" />
+        return <img src={signedContent} alt="Cover" loading="lazy" className="w-full h-full object-cover" />
 
       case 'video':
         if (youtube || vimeo) {
@@ -60,14 +78,22 @@ export default function LoopCard({
             />
           )
         }
+        if (card.is_upload && card.media_uploads?.thumbnail_url) {
+          return (
+            <img
+              src={signedContent}
+              className="w-full h-full object-cover"
+            />
+          )
+        }
         return (
           <video
             src={signedContent}
+            loading="lazy"
             className="w-full h-full object-cover"
-            muted
-            autoPlay
-            loop
-            playsInline
+            muted 
+           // preload="none" use only if you would not want a thumbnail url but this might also make use of unnecessary memory
+            
           />
         )
 

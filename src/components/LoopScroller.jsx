@@ -43,12 +43,12 @@ export default function LoopScroller({ loops = [], layout = 'scroller', hoverRev
       for (const loop of loops) {
         const card = Array.isArray(loop.cards) ? loop.cards[0] : null
         if (!card || !card.is_upload) continue
-
+        console.log(card)
         const paths = [
           { key: `${loop.id}_content`, path: card.content },
           ...(card.media_uploads.thumbnail_url ? [{ key: `${loop.id}_thumbnail`, path: card.media_uploads.thumbnail_url }] : [])
         ]
-        console.log(paths)
+        console.log(card)
 
         for (const { key, path } of paths) {
           const existing = signedUrlsRef.current[key]
@@ -115,15 +115,16 @@ export default function LoopScroller({ loops = [], layout = 'scroller', hoverRev
     const vimeo = getVimeoEmbed(content)
     const spotify = getSpotifyEmbed(content)
 
-    if (type === 'image') return <img src={content} alt="cover" className="w-full h-full object-cover" />
+    if (type === 'image') return <img src={content} alt="cover" className="w-full h-full object-cover" loading="lazy" />
     if (type === 'video') {
       if (youtube) return <iframe src={youtube} title="YouTube" className="w-full h-full object-cover" allow="autoplay" />
       if (vimeo) return <iframe src={vimeo} title="Vimeo" className="w-full h-full object-cover" allow="autoplay" />
       return (
         <>
-          {signedThumbnail ? <img src={signedThumbnail} className="w-full h-full object-cover"/> :         
+          {signedThumbnail ? <img src={signedThumbnail} loading="lazy" className="w-full h-full object-cover"/> :         
           <video
             src={content}
+            loading="lazy"
             poster={signedThumbnail || undefined}
             className="w-full h-full object-cover"
             muted

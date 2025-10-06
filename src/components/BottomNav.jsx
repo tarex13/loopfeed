@@ -46,6 +46,7 @@ export default function BottomNav({showNav}) {
       <ul className="flex justify-around items-center py-2 max-w-md mx-auto">
         {navItems.map(({ to, icon, label }) => {
           if (!user && label=='Logout') return
+          if (!user && label=='You') return
           if (user && label=='Login') return
           const active = isActive(to)
           return (

@@ -50,10 +50,11 @@ export default function EditLoopPage() {
       }
       //console.log(cards)
       // ✅ Resolve signed URLs for uploads
+      console.log(cards);
       const cardsWithUrls = await Promise.all(
         cards.map(async (c) => ({
           type: c.type,
-          file_name: c.media_uploads.file_name,
+          file_name: c.media_uploads?.file_name,
           content: c.is_upload ? await getSignedUrl(c.content) : c.content,
           metadata: c.metadata
         }))

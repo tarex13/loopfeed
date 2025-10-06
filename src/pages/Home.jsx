@@ -46,7 +46,7 @@ export default function Home({setShowNav}) {
         query = query.order('id', { ascending: false })
         break
       case 'Remix Gems':
-        query = query.order('remixes_count', { ascending: false })
+        query = query.order('remixes_count', { ascending: false }).eq('is_remix', 'true')
         break
     }
 
@@ -228,13 +228,15 @@ export default function Home({setShowNav}) {
             ))
           ) : (
             Object.entries(sections).map(([title, section]) => (
-              <Section
-                key={title}
-                title={title}
-                section={section}
-                layout={layout}
-                onLoadMore={() => loadMoreForSection(title)}
-              />
+              <>
+                {section.data.length != 0 && <Section
+                  key={title}
+                  title={title}
+                  section={section}
+                  layout={layout}
+                  onLoadMore={() => loadMoreForSection(title)}
+                />}
+              </>
             ))
           )}
         </div>

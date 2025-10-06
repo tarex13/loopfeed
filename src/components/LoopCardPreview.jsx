@@ -88,14 +88,14 @@ export default function LoopCardPreview({
       <div className="w-full h-full relative flex items-center justify-center overflow-auto vertical-loop-scroller p-4 text-center">
         {/* TEXT */}
         {type === 'text' && (
-          <blockquote className={`text-xl sm:text-2xl absolute top-0 overflow-y-auto font-medium leading-relaxed ${textColor} whitespace-pre-wrap px-4`}>
+          <blockquote className={`text-xl h-[100%] flex items-center sm:text-2xl absolute top-0 overflow-y-auto font-medium leading-relaxed ${textColor} whitespace-pre-wrap px-4`}>
             “{cleanText(url)}”
           </blockquote>
         )}
 
         {/* IMAGE */}
         {type === 'image' && (
-          <img src={url} alt="preview" className="max-h-full max-w-full object-contain rounded shadow" />
+          <img src={url} alt="preview" loading="lazy" className="max-h-full max-w-full object-contain rounded shadow" />
         )}
 
         {/* VIDEO */}
@@ -125,6 +125,7 @@ export default function LoopCardPreview({
               key={url}                 // force new element when URL changes
               ref={videoRef}
               src={url}
+              loading="lazy"
               controls
               preload="metadata"
               crossOrigin="anonymous"

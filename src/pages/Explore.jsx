@@ -41,7 +41,7 @@ export default function Explore() {
     const fetchData = async () => {
       const { data, error } = await supabase
         .from('loops')
-        .select('*, loop_cards(type, content, metadata, is_upload)')
+        .select('*, loop_cards(type, content, metadata, is_upload, media_uploads:media_uploads!loop_cards_media_upload_id_fkey(thumbnail_url))')
         .eq('status', 'normal')
         .eq('visibility', 'public')
 

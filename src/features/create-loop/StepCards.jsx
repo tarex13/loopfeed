@@ -196,7 +196,8 @@ export default function StepCards() {
 
   const fetchMetadata = async (url) => {
     try {
-      const res = await fetch('/api/fetch-metadata', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const res = await fetch(`${supabaseUrl}/functions/v1/fetch-metadata`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),

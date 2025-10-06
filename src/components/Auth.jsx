@@ -186,7 +186,7 @@ if (view === 'login') {
             >
               {loading ? (
                 <span className="loading">
-                  <Loader2 className="icon-spin" /> Processing…
+                  <Loader2 className="icon-spin" /> Looping Through…
                 </span>
               ) : view === 'login' ? (
                 'Sign In'

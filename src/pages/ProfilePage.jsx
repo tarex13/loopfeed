@@ -113,7 +113,7 @@ export default function ProfilePage({ isOwnProfile = false }) {
       const [{ data: loops = [] }, { data: allFolders = [] }, { data: whispers = [] }] = await Promise.all([
         supabase
           .from('loops')
-          .select('*, loop_cards(type, content, metadata, is_upload)')
+          .select('*, loop_cards(type, content, metadata, is_upload, media_uploads:media_uploads!loop_cards_media_upload_id_fkey(thumbnail_url))')
            .eq('status', 'normal')
           .eq('user_id', loadedProfile.id)
           .match(visibilityFilter),
